@@ -1,12 +1,13 @@
 name: 🚨 pre-commit
 
 on:
-  pull_request:
-  push:
-    branches:
-      - 'long_lived/**'
-      - main
-      - 'release/**'
+  workflow_dispatch:
+  # pull_request:
+  # push:
+  #   branches:
+  #     - 'long_lived/**'
+  #     - main
+  #     - 'release/**'
 
 concurrency:
   # SHA is added to the end if on `main` to let all main workflows run
@@ -67,9 +68,8 @@ jobs:
 
     - uses: ./.github/actions/install
       with:
-        python-version: ${{ matrix.python.major_dot_minor }}
         development: true
 
-    - uses: chia-network/actions/activate-venv@main
-
-    - run: pre-commit run --all-files --verbose
+    - uses: pre-commit/action@v2.0.3
+      with:
+        extra_args: --verbose --all-files
