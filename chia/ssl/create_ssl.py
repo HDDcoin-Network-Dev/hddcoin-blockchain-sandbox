@@ -27,8 +27,8 @@ _all_public_node_names: List[str] = ["full_node", "wallet", "farmer", "introduce
 
 
 def get_chia_ca_crt_key() -> Tuple[Any, Any]:
-    crt = pkg_resources.resource_string(__name__, "chia_ca.crt")
-    key = pkg_resources.resource_string(__name__, "chia_ca.key")
+    crt = pkg_resources.resource_string(__name__, "hddcoin_ca.crt")
+    key = pkg_resources.resource_string(__name__, "hddcoin_ca.key")
     return crt, key
 
 
@@ -158,8 +158,8 @@ def create_all_ssl(
     private_ca_key_path = ca_dir / "private_ca.key"
     private_ca_crt_path = ca_dir / "private_ca.crt"
     chia_ca_crt, chia_ca_key = get_chia_ca_crt_key()
-    chia_ca_crt_path = ca_dir / "chia_ca.crt"
-    chia_ca_key_path = ca_dir / "chia_ca.key"
+    chia_ca_crt_path = ca_dir / "hddcoin_ca.crt"
+    chia_ca_key_path = ca_dir / "hddcoin_ca.key"
     write_ssl_cert_and_key(chia_ca_crt_path, chia_ca_crt, chia_ca_key_path, chia_ca_key, overwrite=overwrite)
 
     # If Private CA crt/key are passed-in, write them out
@@ -239,7 +239,7 @@ def generate_ssl_for_nodes(
 
 
 def main():
-    return make_ca_cert(Path("./chia_ca.crt"), Path("./chia_ca.key"))
+    return make_ca_cert(Path("./hddcoin_ca.crt"), Path("./hddcoin_ca.key"))
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from chia.protocols.shared_protocol import capabilities, protocol_version
 from chia.server.outbound_message import NodeType
 from chia.server.server import ChiaServer, ssl_context_for_client
-from chia.server.ssl_context import chia_ssl_ca_paths
+from chia.server.ssl_context import hddcoin_ssl_ca_paths
 from chia.server.ws_connection import WSChiaConnection
 from chia.simulator.time_out_assert import time_out_assert
 from chia.ssl.create_ssl import generate_ca_signed_cert
@@ -43,7 +43,7 @@ async def add_dummy_connection(
     session = aiohttp.ClientSession(timeout=timeout)
     incoming_queue: asyncio.Queue = asyncio.Queue()
     config = load_config(server.root_path, "config.yaml")
-    chia_ca_crt_path, chia_ca_key_path = chia_ssl_ca_paths(server.root_path, config)
+    chia_ca_crt_path, chia_ca_key_path = hddcoin_ssl_ca_paths(server.root_path, config)
     dummy_crt_path = server.root_path / "dummy.crt"
     dummy_key_path = server.root_path / "dummy.key"
     generate_ca_signed_cert(
