@@ -29,8 +29,8 @@ _all_public_node_names: List[str] = ["full_node", "wallet", "farmer", "introduce
 
 
 def get_chia_ca_crt_key() -> Tuple[Any, Any]:
-    crt = pkg_resources.resource_string(__name__, "chia_ca.crt")
-    key = pkg_resources.resource_string(__name__, "chia_ca.key")
+    crt = pkg_resources.resource_string(__name__, "hddcoin_ca.crt")
+    key = pkg_resources.resource_string(__name__, "hddcoin_ca.key")
     return crt, key
 
 
@@ -241,7 +241,7 @@ def generate_ssl_for_nodes(
 
 
 def main():
-    return make_ca_cert(Path("./chia_ca.crt"), Path("./chia_ca.key"))
+    return make_ca_cert(Path("./hddcoin_ca.crt"), Path("./hddcoin_ca.key"))
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from types import FrameType
 from typing import Any, Awaitable, Callable, Coroutine, Dict, Generic, List, Optional, Tuple, Type, TypeVar
 
 from chia.daemon.server import service_launch_lock_path
-from chia.server.ssl_context import chia_ssl_ca_paths, private_ssl_ca_paths
+from chia.server.ssl_context import hddcoin_ssl_ca_paths, private_ssl_ca_paths
 from chia.server.ws_connection import WSChiaConnection
 from chia.util.lock import Lockfile, LockfileError
 
@@ -90,7 +90,7 @@ class Service(Generic[_T_RpcServiceProtocol]):
 
         self._rpc_info = rpc_info
         private_ca_crt, private_ca_key = private_ssl_ca_paths(root_path, self.config)
-        chia_ca_crt, chia_ca_key = chia_ssl_ca_paths(root_path, self.config)
+        chia_ca_crt, chia_ca_key = hddcoin_ssl_ca_paths(root_path, self.config)
         inbound_rlp = self.config.get("inbound_rate_limit_percent")
         outbound_rlp = self.config.get("outbound_rate_limit_percent")
         if node_type == NodeType.WALLET:
