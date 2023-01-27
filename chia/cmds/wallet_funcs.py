@@ -407,7 +407,7 @@ async def make_offer(args: dict, wallet_client: WalletRpcClient, fingerprint: in
             for name, data in printable_dict.items():
                 amount, unit, multiplier = data
                 if multiplier < 0:
-                    print(f"  - {amount} {name} ({int(Decimal(amount) * unit)} mojos)")
+                    print(f"  - {amount} {name} ({int(Decimal(amount) * unit)} bytes)")
             print("REQUESTING:")
             for name, data in printable_dict.items():
                 amount, unit, multiplier = data
@@ -729,6 +729,25 @@ async def print_balances(args: dict, wallet_client: WalletRpcClient, fingerprint
     is_synced: bool = await wallet_client.get_synced()
     is_syncing: bool = await wallet_client.get_sync_status()
 
+    # lazy load HODL stuff here for cleaner diff
+    import chia.hodl.exc
+    from chia.hodl.hodlrpc import HodlRpcClient
+    hodlRpcClient = HodlRpcClient(fingerprint)
+    try:
+        rpcRet  = await hodlRpcClient.get("getTotalHodlForWallet")
+        hodl_balance_mojos = rpcRet["committed_mojos"]
+        hodl_balance_xch = Decimal(hodl_balance_mojos) / int(1e12)
+        # emulating upstream repr for now
+        hodl_balance_str = f"{hodl_balance_xch} xch ({hodl_balance_mojos} mojo)"
+        hodl_type = "HODL Contract(s)"
+    except chia.hodl.exc.HodlConnectionError:
+        hodl_balance_str = "< UNABLE TO CONNECT TO HODL SERVER >"
+    except Exception as e:
+        hodl_balance_str = f"ERROR: {e!r}"
+    finally:
+        hodlRpcClient.close()
+        await hodlRpcClient.await_closed()
+        
     print(f"Wallet height: {await wallet_client.get_height_info()}")
     if is_syncing:
         print("Sync status: Syncing...")
@@ -777,10 +796,100 @@ async def print_balances(args: dict, wallet_client: WalletRpcClient, fingerprint
                 print(f"{indent}{'-Asset ID:'.ljust(23)} {asset_id}")
             print(f"{indent}{'-Wallet ID:'.ljust(23)} {wallet_id}")
 
+            print(" ")
+            print("Chia HODL:")
+            print(f"{indent}{'-Total Balance:'.ljust(23)} {hodl_balance_xch} xch ({hodl_balance_mojos} mojo)")
+            print(f"{indent}{'-Type:'.ljust(23)} {hodl_type}")
+
     print(" ")
     trusted_peers: Dict = config["wallet"].get("trusted_peers", {})
     await print_connections(wallet_client, trusted_peers)
 
+# Chia Defrag #
+async def defrag(args: dict, wallet_client: WalletRpcClient, fingerprint: int) -> None:
+    """Defragment the wallet, reducing the number of coins in it.
+
+    This increases the maximum amount that can be sent in a single transaction.
+
+    """
+    # This is currently an extremely simple algorithm. We just send the maximum possible amount to
+    # ourselves, using the built in wallet restrictions (which are based on "reasonable" cost limits
+    # per block).
+    #
+    # Successive calls to this will always result in a single coin in the wallet.
+    from chia.hodl.util import getNthWalletAddr, getPkSkFromFingerprint, loadConfig
+
+    wallet_id = args["id"]
+    fee_xch = Decimal(args["fee"])
+    fee_mojos = uint64(int(fee_xch * units["chia"]))
+    target_address = args["address"]
+    override = args["override"]
+    no_confirm = args["no_confirm"]
+
+    if fee_xch >= 1 and (override == False):
+        print(f"fee of {fee_xch} XCH seems too large (use --override to force)")
+        return
+    elif target_address and len(target_address) != 62:
+        print("Address is invalid")
+        return
+
+    config = loadConfig()
+    sk = getPkSkFromFingerprint(fingerprint)[1]
+
+    if not target_address:
+        target_address = getNthWalletAddr(config, sk, 0)
+    else:
+        check_count = 100
+        for i in range(check_count):
+            if target_address == getNthWalletAddr(config, sk, i):
+                break  # address is confirmed as one of ours
+        else:
+            print("WARNING!!!\nWARNING!!!\nWARNING!!!  ", end = "")
+            print(f"The given address is not one of the first {check_count} wallet addresses!")
+            print("WARNING!!!\nWARNING!!!")
+            inp = input(f"Is {target_address} where you want to defrag to? [y/N] ")
+            if not inp or inp[0].lower() == "n":
+                print("Aborting defrag!")
+                return
+
+    # Figure out the maximum value the wallet can send at the moment
+    balances = await wallet_client.get_wallet_balance(wallet_id)
+    max_send_mojos = balances["max_send_amount"]
+    spendable_mojos = balances["spendable_balance"]
+    max_send_xch = Decimal(max_send_mojos) / units["chia"]
+    spendable_xch = Decimal(spendable_mojos) / units["chia"]
+    print(f"Total of spendable coins in wallet (right now):    {spendable_xch} XCH")
+    print(f"Maximum value you can send right now (pre-defrag): {max_send_xch} XCH")
+
+    if not no_confirm:
+        if max_send_mojos == spendable_mojos:
+            inp = input("Your wallet is not currently limited by fragmentation! Continue? [y/N] ")
+        else:
+            inp = input("Do you wish to defrag and consolidate some coins? [y/N] ")
+        if not inp or inp[0].lower() == "n":
+            print("Aborting defrag!")
+            return
+
+    # Now do one round of defrag!
+    defrag_coin_size_mojos = max_send_mojos - fee_mojos
+    res = await wallet_client.send_transaction(wallet_id,
+                                               defrag_coin_size_mojos,
+                                               target_address,
+                                               fee_mojos)
+
+    tx_id = res.name
+    start = time.time()
+    while time.time() - start < 10:
+        await asyncio.sleep(0.1)
+        tx = await wallet_client.get_transaction(wallet_id, tx_id)
+        if len(tx.sent_to) > 0:
+            print(f"Defrag transaction submitted to nodes: {tx.sent_to}")
+            print(f"Do chia wallet get_transaction -f {fingerprint} -tx 0x{tx_id} to get status")
+            return
+
+    print("Defrag transaction not yet submitted to nodes")
+    print(f"Do 'chia wallet get_transaction -f {fingerprint} -tx 0x{tx_id}' to get status")
+    
 
 async def create_did_wallet(args: Dict, wallet_client: WalletRpcClient, fingerprint: int) -> None:
     amount = args["amount"]
