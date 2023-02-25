@@ -36,7 +36,8 @@ If ($LastExitCode -gt 0){
     Throw "npm run build failed!"
 }
 
-Copy-Item ".\node_modules\node-pty\build\Release\" -Destination "$env:GITHUB_WORKSPACE\chia-blockchain-gui\packages\gui\node_modules\node-pty\build\Release\" -Recurse -Force
+Copy-Item ".\node_modules\node-pty\build\Release\winpty.dll" -Destination "$env:GITHUB_WORKSPACE\chia-blockchain-gui\packages\gui\build\renderer\_\_\node_modules\node-pty\build\Release\" -Recurse -Force
+Copy-Item ".\node_modules\node-pty\build\Release\winpty-agent.exe" -Destination "$env:GITHUB_WORKSPACE\chia-blockchain-gui\packages\gui\build\renderer\_\_\node_modules\node-pty\build\Release\" -Recurse -Force
 
 # Remove unused packages
 Remove-Item node_modules -Recurse -Force
